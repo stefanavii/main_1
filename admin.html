@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submissions - Admin View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a10; --panel:#14121c; --text:#f2efe9; --text-dim:#a8a6ac;
+    --green:#4ade80; --violet:#7c5cff;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family:'Inter', sans-serif;
+    padding:40px;
+  }
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    margin-bottom:6px;
+  }
+  .sub{ color: var(--text-dim); margin-bottom:28px; font-size:14px; }
+
+  section{ margin-bottom:48px; }
+
+  h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:18px;
+    margin-bottom:14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .dot.green{ background: var(--green); }
+  .dot.violet{ background: var(--violet); }
+
+  table{
+    width:100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border-radius:12px;
+    overflow:hidden;
+  }
+  th, td{
+    text-align:left;
+    padding:14px 16px;
+    font-size:14px;
+    border-bottom:1px solid rgba(255,255,255,0.07);
+  }
+  th{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:12px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+  }
+  #applicantsSection th{ color: var(--green); }
+  #enrollmentsSection th{ color: var(--violet); }
+  tr:last-child td{ border-bottom:none; }
+  .empty{ color: var(--text-dim); padding:24px; text-align:center; background: var(--panel); border-radius:12px; font-size:14px; }
+  .refresh{
+    background: var(--text);
+    color:#0a0a10;
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+    margin-bottom:30px;
+  }
+</style>
+</head>
+<body>
+  <h1>Submissions</h1>
+  <p class="sub">Live data from the MySQL database.</p>
+  <button class="refresh" onclick="loadAll()">Refresh</button>
+
+  <section id="applicantsSection">
+    <h2><span class="dot green"></span>Agent Vacancy Applicants</h2>
+    <div id="applicantsContent">Loading...</div>
+  </section>
+
+  <section id="enrollmentsSection">
+    <h2><span class="dot violet"></span>AI Course Enrollments</h2>
+    <div id="enrollmentsContent">Loading...</div>
+  </section>
+
+  <script>
+    function renderTable(rows, idLabel){
+      if (!rows || rows.length === 0) {
+        return `<p class="empty">No ${idLabel} yet.</p>`;
+      }
+      let html = '<table><thead><tr><th>ID</th><th>Full Name</th><th>Email</th><th>Phone</th><th>NIC</th><th>Submitted At</th></tr></thead><tbody>';
+      rows.forEach(r => {
+        html += `<tr>
+          <td>${r.id}</td>
+          <td>${r.full_name}</td>
+          <td>${r.email}</td>
+          <td>${r.phone_number}</td>
+          <td>${r.nic_number}</td>
+          <td>${new Date(r.submitted_at).toLocaleString()}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    async function loadApplicants(){
+      const el = document.getElementById('applicantsContent');
+      try {
+        const res = await fetch('/api/applicants');
+        const data = await res.json();
+        el.innerHTML = data.success ? renderTable(data.applicants, 'applicants') : '<p class="empty">Could not load data.</p>';
+      } catch (err) {
+        el.innerHTML = '<p class="empty">Could not load data. Is the server running?</p>';
+      }
+    }
+
+    async function loadEnrollments(){
+      const el = document.getElementById('enrollmentsContent');
+      try {
+        const res = await fetch('/api/enrollments');
+        const data = await res.json();
+        el.innerHTML = data.success ? renderTable(data.enrollments, 'enrollments') : '<p class="empty">Could not load data.</p>';
+      } catch (err) {
+        el.innerHTML = '<p class="empty">Could not load data. Is the server running?</p>';
+      }
+    }
+
+    function loadAll(){
+      document.getElementById('applicantsContent').textContent = 'Loading...';
+      document.getElementById('enrollmentsContent').textContent = 'Loading...';
+      loadApplicants();
+      loadEnrollments();
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>
