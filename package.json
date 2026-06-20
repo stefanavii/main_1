@@ -1,0 +1,19 @@
+{
+  "name": "agent-vacancy-backend",
+  "version": "1.0.0",
+  "description": "Backend server with SQL database for the Agent Vacancy application form",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.5"
+  }
+}
