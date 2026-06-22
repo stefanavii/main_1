@@ -10,6 +10,7 @@ const path = require("path");
 const mysql = require("mysql2/promise");
 
 const PORT = process.env.PORT || 3000;
+const SITE_ID = process.env.SITE_ID || "1011"; // Default = Main site. Each copy sets its own value in Railway.
 
 const DB_CONFIG = {
   host: process.env.DB_HOST || "localhost",
@@ -51,6 +52,7 @@ async function initDb() {
       email VARCHAR(255) NOT NULL,
       phone_number VARCHAR(50) NOT NULL,
       nic_number VARCHAR(20) NOT NULL,
+      source_id VARCHAR(10) NOT NULL DEFAULT '1011',
       submitted_at DATETIME NOT NULL
     )
   `);
@@ -62,9 +64,29 @@ async function initDb() {
       email VARCHAR(255) NOT NULL,
       phone_number VARCHAR(50) NOT NULL,
       nic_number VARCHAR(20) NOT NULL,
+      course_path VARCHAR(50) NOT NULL DEFAULT 'AI Path',
+      source_id VARCHAR(10) NOT NULL DEFAULT '1011',
       submitted_at DATETIME NOT NULL
     )
   `);
+
+  // If these tables already existed from before (without source_id/course_path), add the columns safely.
+  // This lets the upgrade apply to your already-running live database without losing data.
+  await addColumnIfMissing("applicants", "source_id", "VARCHAR(10) NOT NULL DEFAULT '1011'");
+  await addColumnIfMissing("enrollments", "source_id", "VARCHAR(10) NOT NULL DEFAULT '1011'");
+  await addColumnIfMissing("enrollments", "course_path", "VARCHAR(50) NOT NULL DEFAULT 'AI Path'");
+}
+
+async function addColumnIfMissing(table, column, definition) {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [DB_CONFIG.database, table, column]
+  );
+  if (rows[0].cnt === 0) {
+    await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    console.log(`Added missing column '${column}' to '${table}'.`);
+  }
 }
 
 // ---------- Validation helpers ----------
@@ -109,9 +131,9 @@ app.post("/api/applicants", async (req, res) => {
 
   try {
     await pool.query(
-      `INSERT INTO applicants (full_name, email, phone_number, nic_number, submitted_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [full_name.trim(), email.trim(), phone_number.trim(), nic_number.trim(), new Date()]
+      `INSERT INTO applicants (full_name, email, phone_number, nic_number, source_id, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [full_name.trim(), email.trim(), phone_number.trim(), nic_number.trim(), SITE_ID, new Date()]
     );
 
     res.status(201).json({ success: true, message: "Application submitted successfully." });
@@ -126,7 +148,7 @@ app.post("/api/applicants", async (req, res) => {
 app.get("/api/applicants", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT id, full_name, email, phone_number, nic_number, submitted_at FROM applicants ORDER BY id DESC"
+      "SELECT id, full_name, email, phone_number, nic_number, source_id, submitted_at FROM applicants ORDER BY id DESC"
     );
     res.json({ success: true, count: rows.length, applicants: rows });
   } catch (err) {
@@ -137,7 +159,9 @@ app.get("/api/applicants", async (req, res) => {
 
 // Submit a new AI course enrollment
 app.post("/api/enrollments", async (req, res) => {
-  const { full_name, email, phone_number, nic_number } = req.body || {};
+  const { full_name, email, phone_number, nic_number, course_path } = req.body || {};
+
+  const VALID_PATHS = ["AI Path", "Youth Path", "Creator Path", "Marketing Path"];
 
   const errors = [];
 
@@ -153,6 +177,9 @@ app.post("/api/enrollments", async (req, res) => {
   if (!nic_number || !isValidNic(nic_number.trim())) {
     errors.push("A valid NIC number is required (e.g. 123456789V or 200012345678).");
   }
+  if (!course_path || !VALID_PATHS.includes(course_path)) {
+    errors.push("Please select one course path.");
+  }
 
   if (errors.length > 0) {
     return res.status(400).json({ success: false, errors });
@@ -160,9 +187,9 @@ app.post("/api/enrollments", async (req, res) => {
 
   try {
     await pool.query(
-      `INSERT INTO enrollments (full_name, email, phone_number, nic_number, submitted_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [full_name.trim(), email.trim(), phone_number.trim(), nic_number.trim(), new Date()]
+      `INSERT INTO enrollments (full_name, email, phone_number, nic_number, course_path, source_id, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [full_name.trim(), email.trim(), phone_number.trim(), nic_number.trim(), course_path, SITE_ID, new Date()]
     );
 
     res.status(201).json({ success: true, message: "Enrollment submitted successfully." });
@@ -176,7 +203,7 @@ app.post("/api/enrollments", async (req, res) => {
 app.get("/api/enrollments", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT id, full_name, email, phone_number, nic_number, submitted_at FROM enrollments ORDER BY id DESC"
+      "SELECT id, full_name, email, phone_number, nic_number, course_path, source_id, submitted_at FROM enrollments ORDER BY id DESC"
     );
     res.json({ success: true, count: rows.length, enrollments: rows });
   } catch (err) {
